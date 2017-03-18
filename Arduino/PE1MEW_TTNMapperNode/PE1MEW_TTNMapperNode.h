@@ -38,7 +38,13 @@
 
 #define PAYLOAD_BUFFER_SIZE       9     ///< paylod message size
 
-#define GEOFENCE_DIAMETER         1000  ///< diameter of the geofence circle 
+#define GEOFENCE_DIAMETER         300  ///< diameter of the geofence circle 
+
+/// \brief Various keys for personalisation of the TTN MApper node.
+/// Set your DevAddr, NwkSKey, AppSKey
+const char devAddr[] = "26011AB8";                           ///< Device address
+const char nwkSKey[] = "FDB5A9347BFCCC50D8AC4E37F1B91F22";   ///< Network Session key
+const char appSKey[] = "E7D0BBDC73684E6B803F6976CD1FBB3D";   ///< Application Session key
 
 /// Number of geofences
 #define COORDINATES_COUNT 3
@@ -46,7 +52,7 @@
 /// \brief Defines geofence coordinates
 /// These coordinates are the center of a circle 
 /// The number of coordinates shall be the same as the COORDINATES_COUNT define!
-const PROGMEM double coordinates[3][2] = { 
+const double coordinates[3][2] = { 
   {00.00000, 0.00000},  ///< Coordinate 1: 
   {00.00000, 0.00000},  ///< Coordinate 2: 
   {00.00000, 0.00000}   ///< Coordinate 3: 

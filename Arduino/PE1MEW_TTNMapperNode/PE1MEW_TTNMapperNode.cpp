@@ -186,7 +186,7 @@ void PE1MEW_TTNMapperNode::process(void)
         {
           _nextState = STATE_GPS_VALID;
         }
-        else if (_buttonState == STATE_PRESSED_T2)
+        else if (_buttonState == STATE_PRESSED_T1)
         {
           _nextState = STATE_RUN_TX;
           _button.reset(); // reset button evaluation
@@ -261,8 +261,8 @@ void PE1MEW_TTNMapperNode::initializeRadio()
   //ABP: initABP(String addr, String AppSKey, String NwkSKey);
   // Application ID: rfsee_ttnmapper
   // Device ID: rfsee_drivetest_unit_3
-  //join_result = _lora->initABP(devAddr, nwkSKey, appSKey); // \todo implement this code.
-  join_result = _lora->initABP("00000000", "00000000000000000000000000000000", "00000000000000000000000000000000");
+//  join_result = _lora->initABP(devAddr, nwkSKey, appSKey); // \todo implement this code.
+  join_result = _lora->initABP("26011AB8", "FDB5A9347BFCCC50D8AC4E37F1B91F22", "E7D0BBDC73684E6B803F6976CD1FBB3D");
 
   while(!join_result)
   {
@@ -287,26 +287,26 @@ bool PE1MEW_TTNMapperNode::testGeoFence(void)
   bool returnValue = false;
   double distance = 0;
 
-  distance = _gps.distanceBetween( _gps.location.lat(), _gps.location.lng(), coordinates[0][0], coordinates[0][1] ); 
-  if (distance < GEOFENCE_DIAMETER)
-  {
-    returnValue = true;
-  }
-
-  distance = _gps.distanceBetween( _gps.location.lat(), _gps.location.lng(), coordinates[1][0], coordinates[1][1] ); 
-  if (distance < GEOFENCE_DIAMETER)
-  {
-    returnValue = true;
-  }
+//  distance = _gps.distanceBetween( _gps.location.lat(), _gps.location.lng(), coordinates[0][0], coordinates[0][1] ); 
+//  if (distance < GEOFENCE_DIAMETER)
+//  {
+//    returnValue = true;
+//  }
+//
+//  distance = _gps.distanceBetween( _gps.location.lat(), _gps.location.lng(), coordinates[1][0], coordinates[1][1] ); 
+//  if (distance < GEOFENCE_DIAMETER)
+//  {
+//    returnValue = true;
+//  }
+//  
+//#if defined(GEOFENCE_3)
+//  distance = _gps.distanceBetween( _gps.location.lat(), _gps.location.lng(), coordinates[2][0], coordinates[2][1] ); 
+//  if (distance < GEOFENCE_DIAMETER)
+//  {
+//    returnValue = true;
+//  }
+//#endif
   
-#if defined(GEOFENCE_3)
-  distance = _gps.distanceBetween( _gps.location.lat(), _gps.location.lng(), coordinates[2][0], coordinates[2][1] ); 
-  if (distance < GEOFENCE_DIAMETER)
-  {
-    returnValue = true;
-  }
-#endif
-/*  
   /// \todo why is this not working?
   
   for (int i = 0; i < COORDINATES_COUNT; i++)
@@ -316,12 +316,11 @@ bool PE1MEW_TTNMapperNode::testGeoFence(void)
                                      coordinates[i][0],
                                      coordinates[i][1] );
 
-    if (distance < EOFENCE_DIAMETER)
+    if (distance < GEOFENCE_DIAMETER)
     {
       returnValue = true;
     }
   }
-*/
  
   return returnValue;
 }
