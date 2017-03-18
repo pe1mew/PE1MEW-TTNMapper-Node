@@ -287,28 +287,6 @@ bool PE1MEW_TTNMapperNode::testGeoFence(void)
   bool returnValue = false;
   double distance = 0;
 
-//  distance = _gps.distanceBetween( _gps.location.lat(), _gps.location.lng(), coordinates[0][0], coordinates[0][1] ); 
-//  if (distance < GEOFENCE_DIAMETER)
-//  {
-//    returnValue = true;
-//  }
-//
-//  distance = _gps.distanceBetween( _gps.location.lat(), _gps.location.lng(), coordinates[1][0], coordinates[1][1] ); 
-//  if (distance < GEOFENCE_DIAMETER)
-//  {
-//    returnValue = true;
-//  }
-//  
-//#if defined(GEOFENCE_3)
-//  distance = _gps.distanceBetween( _gps.location.lat(), _gps.location.lng(), coordinates[2][0], coordinates[2][1] ); 
-//  if (distance < GEOFENCE_DIAMETER)
-//  {
-//    returnValue = true;
-//  }
-//#endif
-  
-  /// \todo why is this not working?
-  
   for (int i = 0; i < COORDINATES_COUNT; i++)
   {
     distance = _gps.distanceBetween( _gps.location.lat(),
