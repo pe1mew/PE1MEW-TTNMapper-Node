@@ -15,12 +15,18 @@
 
 /// \file PE1MEW_TTNMApperNode.h
 /// \brief TTN Mapper class to control the TTN Mapper node
-/// \date 15-3-2017
+/// \date 15-9-2017
 /// \author Remko Welling (PE1MEW)
+/// \version 1.1  15-09-201 Modification SF to SF9,
+///                         Correction of statemachine in PE1MEW_TTNMapperNode
 /// \version 1.0  Initial version
 
 #ifndef __PE1MEW_TTNMAPPERNODE_H__
 #define __PE1MEW_TTNMAPPERNODE_H__
+
+//#define rfsee_drivetest_unit_3  // Production in drivetest vehicle
+#define rfsee_drivetest_unit_4
+
 
 #include "PE1MEW_Led.h"             // PE1MEW_Led class
 #include "PE1MEW_Button.h"
@@ -36,26 +42,37 @@
 #define TRANSMISSION_INTERVAL     10000 ///< Transmission interval in milliseconds (10 seconds)
 #define TRANSMISSION_DELAY        3000  ///< Delay between transmissions.
 
-#define PAYLOAD_BUFFER_SIZE       9     ///< paylod message size
+#define DEFAULT_DR                3     ///, default datarate SF9
+
+#define PAYLOAD_BUFFER_SIZE       9     ///< payload message size
 
 #define GEOFENCE_DIAMETER         300  ///< diameter of the geofence circle 
 
 /// \brief Various keys for personalisation of the TTN MApper node.
+/// \todo implement correct code in cpp file
 /// Set your DevAddr, NwkSKey, AppSKey
-const char devAddr[] = "26011AB8";                           ///< Device address
-const char nwkSKey[] = "FDB5A9347BFCCC50D8AC4E37F1B91F22";   ///< Network Session key
-const char appSKey[] = "E7D0BBDC73684E6B803F6976CD1FBB3D";   ///< Application Session key
+#if defined(rfsee_drivetest_unit_4) 
+  const char devAddr[] = "xxxxxxxx";                           ///< Device address
+  const char nwkSKey[] = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";   ///< Network Session key
+  const char appSKey[] = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";   ///< Application Session key
+#elif defined(rfsee_drivetest_unit_3)
+  const char devAddr[] = "xxxxxxxx";                           ///< Device address
+  const char nwkSKey[] = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";   ///< Network Session key
+  const char appSKey[] = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";   ///< Application Session key
+#else
+  #error "No drivetest_unit configured."
+#endif
 
 /// Number of geofences
-#define COORDINATES_COUNT 3
+#define COORDINATES_COUNT 2
 
 /// \brief Defines geofence coordinates
 /// These coordinates are the center of a circle 
 /// The number of coordinates shall be the same as the COORDINATES_COUNT define!
 const double coordinates[3][2] = { 
-  {00.00000, 0.00000},  ///< Coordinate 1: 
-  {00.00000, 0.00000},  ///< Coordinate 2: 
-  {00.00000, 0.00000}   ///< Coordinate 3: 
+  {52.00000, 5.00000},  ///< Coordinate 1: location A
+  {52.00000, 5.00000},  ///< Coordinate 2: Location B
+  {52.00000, 5.00000}   ///< Coordinate 3: Test location
 };
 
 /// Brutal method to switch geofence on and off

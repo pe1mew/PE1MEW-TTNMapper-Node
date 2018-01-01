@@ -15,9 +15,11 @@
 
 /// \file PE1MEW_TTNMapperNode.ino
 /// \brief PE1MEW TTN Mapper node
-/// \date 15-3-2017
+/// \date 15-9-2017
 /// \author Remko Welling (PE1MEW)
-/// \version 1.0  Initial version
+/// \version 1.1  15-09-201 Modification SF to SF9,
+///                         Correction of statemachine in PE1MEW_TTNMapperNode
+/// \version 1.0  15-03-201 Initial version
 
 
 /// \mainpage TTN Mapper node with GUI by PE1MEW

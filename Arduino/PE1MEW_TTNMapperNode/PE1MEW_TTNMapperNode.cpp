@@ -149,13 +149,13 @@ void PE1MEW_TTNMapperNode::process(void)
       break;
         
       case STATE_GPS_VALID:
-        if (testGeoFence())
-        {
-          _nextState = STATE_RUN_GEOFENCE;
-        }
-        else if (currentTime - _lastGPSFixTime > GPS_RX_FIX_TIMEOUT_TIME)
+        if (currentTime - _lastGPSFixTime > GPS_RX_FIX_TIMEOUT_TIME)
         {
           _nextState = STATE_GPS_DATA;
+        }
+        else if (testGeoFence())
+        {
+          _nextState = STATE_RUN_GEOFENCE;
         }
         else if ((currentTime - _lastTransmissionTime > TRANSMISSION_INTERVAL) && (_schemaType == SCHEME_INTERVAL))
         {
@@ -182,7 +182,11 @@ void PE1MEW_TTNMapperNode::process(void)
       break;
 
       case STATE_RUN_GEOFENCE:
-        if (!testGeoFence())
+        if (currentTime - _lastGPSFixTime > GPS_RX_FIX_TIMEOUT_TIME)
+        {
+          _nextState = STATE_GPS_DATA;
+        }
+        else if (!testGeoFence())
         {
           _nextState = STATE_GPS_VALID;
         }
@@ -258,11 +262,13 @@ void PE1MEW_TTNMapperNode::initializeRadio()
   //configure your keys and join the network
   bool join_result = false;
 
-  //ABP: initABP(String addr, String AppSKey, String NwkSKey);
-  // Application ID: rfsee_ttnmapper
-  // Device ID: rfsee_drivetest_unit_3
-//  join_result = _lora->initABP(devAddr, nwkSKey, appSKey); // \todo implement this code.
-  join_result = _lora->initABP("26011AB8", "FDB5A9347BFCCC50D8AC4E37F1B91F22", "E7D0BBDC73684E6B803F6976CD1FBB3D");
+#if defined(rfsee_drivetest_unit_4) 
+  join_result = _lora->initABP("26011D75", "66F52CEFE90A70BD814DE2CD7855B56F", "1C8B3A7C728D71B4B419ABFC2685034C"); // unit 4
+#elif defined(rfsee_drivetest_unit_3)
+  join_result = _lora->initABP("26011AB8", "FDB5A9347BFCCC50D8AC4E37F1B91F22", "E7D0BBDC73684E6B803F6976CD1FBB3D"); // unit 3
+#else
+  #error "No drivetest_unit configured."
+#endif
 
   while(!join_result)
   {
@@ -278,6 +284,8 @@ void PE1MEW_TTNMapperNode::initializeRadio()
   }
   Serial.println("Successfully joined TTN");
   delay(1000); // wait a second before continuing.
+
+  _lora->setDR(DEFAULT_DR);
   
   _ledAct.setOff();
 }
