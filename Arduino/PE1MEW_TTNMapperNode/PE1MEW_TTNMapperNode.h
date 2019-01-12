@@ -22,45 +22,28 @@
 #ifndef __PE1MEW_TTNMAPPERNODE_H__
 #define __PE1MEW_TTNMAPPERNODE_H__
 
-#include "PE1MEW_Led.h"             // PE1MEW_Led class
-#include "PE1MEW_Button.h"
-#include "TinyGPS++.h"              // TinyGPS++ class
-#include <rn2xx3.h>                 // LoRa radio RN2xx3 class
+#include "PE1MEW_TTNMapperNode_configuration.h"
 
-#define GPS_LED_PIN   2                ///< Pin to which the GPS LED is connected
-#define STAT_LED_PIN  1                ///< Pin to which the Status LED is connected
-#define ACT_LED_PIN   0                ///< Pin to which the Activity LED is connected
+#include "PE1MEW_Led.h"                 // PE1MEW_Led class
+#include "PE1MEW_Button.h"              // PE1MEW_Button class
+#include "TinyGPS++.h"                  // TinyGPS++ class
+//#include <rn2xx3.h>                   // LoRa radio RN2xx3 class from library
+#include "rn2xx3.h"                     // LoRa radio RN2xx3 class local copy
+#include "RunningAverage.h"             // Running average library
+#include "PE1MEW_Timer.h"
 
-#define GPS_RX_DATA_TIMEOUT_TIME  5000  ///< timeout in milliseconds for data reception of GPS (5 seconds)
-#define GPS_RX_FIX_TIMEOUT_TIME   5000  ///< timeout in mill seconds for the GPS FIX (5 seconds)
-#define TRANSMISSION_INTERVAL     10000 ///< Transmission interval in milliseconds (10 seconds)
-#define TRANSMISSION_DELAY        3000  ///< Delay between transmissions.
+#define GPS_LED_PIN               2     ///< Pin to which the GPS LED is connected
+#define STAT_LED_PIN              1     ///< Pin to which the Status LED is connected
+#define ACT_LED_PIN               0     ///< Pin to which the Activity LED is connected
 
-#define PAYLOAD_BUFFER_SIZE       9     ///< paylod message size
-
-#define GEOFENCE_DIAMETER         300  ///< diameter of the geofence circle 
-
-/// \brief Various keys for personalisation of the TTN MApper node.
-/// Set your DevAddr, NwkSKey, AppSKey
-const char devAddr[] = "26011AB8";                           ///< Device address
-const char nwkSKey[] = "FDB5A9347BFCCC50D8AC4E37F1B91F22";   ///< Network Session key
-const char appSKey[] = "E7D0BBDC73684E6B803F6976CD1FBB3D";   ///< Application Session key
-
-/// Number of geofences
-#define COORDINATES_COUNT 3
-
-/// \brief Defines geofence coordinates
-/// These coordinates are the center of a circle 
-/// The number of coordinates shall be the same as the COORDINATES_COUNT define!
-const double coordinates[3][2] = { 
-  {00.00000, 0.00000},  ///< Coordinate 1: 
-  {00.00000, 0.00000},  ///< Coordinate 2: 
-  {00.00000, 0.00000}   ///< Coordinate 3: 
-};
-
-/// Brutal method to switch geofence on and off
-/// \todo solve this.
-//#define GEOFENCE_3  ///< Enable to test for geofence 3
+//#define GPS_RX_DATA_TIMEOUT_TIME  5000  ///< timeout in milliseconds for data reception of GPS (5 seconds)
+//#define GPS_RX_FIX_TIMEOUT_TIME   5000  ///< timeout in mill seconds for the GPS FIX (5 seconds)
+//#define TRANSMISSION_INTERVAL     10000 ///< Transmission interval in milliseconds (10 seconds) to be used with SCHEME_INTERVAL
+//#define TRANSMISSION_DELAY        8000  ///< Delay between transmissions. to be used with SCHEME_REPEAT
+//
+//#define DEFAULT_DR                3     ///< default datarate SF9
+//
+//#define PAYLOAD_BUFFER_SIZE       9     ///< paylod message size
 
 /// \brief Defines states of the TTN Mapper Node.
 typedef enum {
@@ -68,6 +51,7 @@ typedef enum {
    STATE_GPS_DATA,      ///< Data received from GPS but no FIX
    STATE_GPS_VALID,     ///< Data received from GPS and GPS has fix.
    STATE_RUN_TX,        ///< GPS has fix, actual position is transmitted
+   STATE_RUN_PAUSE,     ///< GPS has fix but node is not moving for x minutes.
    STATE_RUN_GEOFENCE   ///< GPS has fix but coordinate is within geofence.
 } eStates;
 
@@ -76,6 +60,11 @@ typedef enum {
    SCHEME_INTERVAL,    ///< Transmission at regular intervals
    SCHEME_REPEAT       ///< repeat transmission with fixed delay
 } eSchema;
+
+typedef struct{
+  double longitude;
+  double latitude;
+} Coordinate_t;
 
 /// \class PE1MEW_TTNMapperNode PE1MEW_TTNMapperNode.h <PE1MEW_TTNMapperNode.h>
 /// \brief Central class that coordinates behavior of the node
@@ -86,6 +75,15 @@ public:
 protected:
 
 private:
+
+  const static int GPS_RX_DATA_TIMEOUT_TIME = 5000;  ///< timeout in milliseconds for data reception of GPS (5 seconds)
+  const static int GPS_RX_FIX_TIMEOUT_TIME =  5000;  ///< timeout in mill seconds for the GPS FIX (5 seconds)
+  
+  const static int TRANSMISSION_INTERVAL =    10000; ///< Transmission interval in milliseconds (10 seconds) to be used with SCHEME_INTERVAL
+  const static int TRANSMISSION_DELAY =       8000;  ///< Delay between transmissions. to be used with SCHEME_REPEAT
+  const static int STATIC_INTERVAL_COUNT =    50;    ///< When state is static transmit after n times not transmitting send message anyway
+  const static int DEFAULT_DR =               3;     ///< default datarate SF9
+  const static int PAYLOAD_BUFFER_SIZE =      9;     ///< paylod message size
 
   /// Current state of the node
   eStates _currentState;
@@ -116,17 +114,25 @@ private:
   
   /// HDOP of the GPS. HDOP represents accuracy of the coordinate
   uint8_t  _hdopGps;
- 
+
+  uint8_t  _moveCounter;
+
+  bool _isMoving;
+
+  int _staticIntervalCounter;
+  
+  Coordinate_t _lastCoordinate;
+
   eSchema _schemaType;
 
   /// GPS-LED (Green) for information about the GPS operation.
-  PE1MEW_Led  _ledGPS = PE1MEW_Led(GPS_LED_PIN);
+  PE1MEW_Led _ledGPS = PE1MEW_Led(GPS_LED_PIN);
   
   /// Status-LED (Yellow) for information about the Node operation.
-  PE1MEW_Led  _ledStat = PE1MEW_Led(STAT_LED_PIN);
+  PE1MEW_Led _ledStat = PE1MEW_Led(STAT_LED_PIN);
   
   /// Activity-LED (Yellow) for information about the LoRa radio operation.
-  PE1MEW_Led  _ledAct = PE1MEW_Led(ACT_LED_PIN); 
+  PE1MEW_Led _ledAct = PE1MEW_Led(ACT_LED_PIN); 
 
   PE1MEW_Button _button = PE1MEW_Button(24);
 
@@ -136,8 +142,12 @@ private:
   TinyGPSPlus _gps = TinyGPSPlus();
 
   /// rn2453 object
-  rn2xx3*     _lora;
+  rn2xx3* _lora;
 
+  RunningAverage _averageDistanceBuffer = RunningAverage(MOVING_COUNTER_MAXIMUM);
+
+  PE1MEW_Timer timer1 = PE1MEW_Timer();
+ 
 //functions
 public:
 
@@ -178,6 +188,8 @@ private:
   /// \return true if coordinate is within geofence, false if coordinate is outside geofence.
   bool testGeoFence(void);
 
+  bool evaluateMoving(void);
+   
 }; //PE1MEW_TTNMapperNode
 
 #endif //__PE1MEW_TTNMAPPERNODE_H__

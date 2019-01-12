@@ -29,8 +29,8 @@
 
 #include <stdint.h>
 
-/// Default delay of 150 ms
-static uint16_t  DEFAULT_DELAY	= 150;
+///// Default delay of 150 ms
+//#define DEFAULT_DELAY 150
 
 /// \brief defines states of the LED
 typedef	enum { 
@@ -49,7 +49,10 @@ public:
 protected:
 private:
 
-   /// pin number of the pin to wich the LED is connected
+   /// Default delay of 150 ms
+  const static uint16_t  DEFAULT_DELAY = 150;
+
+  /// pin number of the pin to wich the LED is connected
    uint8_t _ledPin;
    
    /// Current state of the LED

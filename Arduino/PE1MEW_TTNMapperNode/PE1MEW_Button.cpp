@@ -96,7 +96,7 @@ eStateButton PE1MEW_Button::process(void)
       }
     break;
     
-    case PRESS_TIME_T1:
+    case STATE_PRESSED_T1:
       if (millis() - _pressStartTime > PRESS_TIME_T2)
       {
         _nextState = STATE_PRESSED_T2;

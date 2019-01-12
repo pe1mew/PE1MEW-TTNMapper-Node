@@ -15,16 +15,21 @@
 
 /// \file PE1MEW_TTNMApperNode.cpp
 /// \brief TTN Mapper class to control the TTN Mapper node
-/// \date 15-3-2017
+/// \date 21-09-2018
 /// \author Remko Welling (PE1MEW)
+/// \version 1.2  Added functionality to periodically transmit when node is not moving
+/// \version 1.1  Added functionality to stop transmitting when node is not moving
+///               Removed static ABP parameters and moved to file PE1MEW_TTNMapper_configuration.h
 /// \version 1.0  Initial version
 
 #include "PE1MEW_TTNMapperNode.h"
 
 #include <arduino.h> 
 
-#include "TinyGPS++.h"              // TinyGPS++ class
-#include <rn2xx3.h>                 // LoRa radio RN2xx3 class
+#include "TinyGPS++.h"  // TinyGPS++ class
+//#include <rn2xx3.h>   // LoRa radio RN2xx3 class from library
+#include "rn2xx3.h"     // LoRa radio RN2xx3 class local copy
+
 
 PE1MEW_TTNMapperNode::PE1MEW_TTNMapperNode(rn2xx3* loraObject):
   _currentState(STATE_GPS_DATA),
@@ -36,9 +41,12 @@ PE1MEW_TTNMapperNode::PE1MEW_TTNMapperNode(rn2xx3* loraObject):
   _longitudeBinary(0),
   _altitudeGps(0),
   _hdopGps(0),
+  _moveCounter(0),
+  _isMoving(true),
+  _staticIntervalCounter(STATIC_INTERVAL_COUNT),
   _schemaType(SCHEME_REPEAT),
   _buttonState(STATE_NOT_PRESSED),
-  _lora(loraObject)
+  _lora(loraObject)  
 {
   initialize();
 } //PE1MEW_TTNMapperNode
@@ -60,6 +68,9 @@ void PE1MEW_TTNMapperNode::initialize(void)
   _ledGPS.startBlink(1); // 2 blinks at period time of 500 ms
   _ledStat.startBlink(2);
   _ledAct.startBlink(3);
+
+  // explicitly start with clean average buffer
+  _averageDistanceBuffer.clear();
 }
 
 void PE1MEW_TTNMapperNode::process(void)
@@ -113,6 +124,10 @@ void PE1MEW_TTNMapperNode::process(void)
         _ledAct.setOn();
       break;
 
+      case STATE_RUN_PAUSE:
+        _ledAct.startBlink(true, 1, 100);
+      break;
+      
       case STATE_RUN_GEOFENCE:
         _ledStat.setOn();
       break;
@@ -120,7 +135,7 @@ void PE1MEW_TTNMapperNode::process(void)
       default:
 
       break;
-    }// end switch
+    } // end switch
   } // end if
   
   // switch current state to next state
@@ -149,20 +164,40 @@ void PE1MEW_TTNMapperNode::process(void)
       break;
         
       case STATE_GPS_VALID:
-        if (testGeoFence())
-        {
-          _nextState = STATE_RUN_GEOFENCE;
-        }
-        else if (currentTime - _lastGPSFixTime > GPS_RX_FIX_TIMEOUT_TIME)
+        if (currentTime - _lastGPSFixTime > GPS_RX_FIX_TIMEOUT_TIME)
         {
           _nextState = STATE_GPS_DATA;
         }
-        else if ((currentTime - _lastTransmissionTime > TRANSMISSION_INTERVAL) && (_schemaType == SCHEME_INTERVAL))
+        else if (testGeoFence())
+        {
+          _nextState = STATE_RUN_GEOFENCE;
+        }
+        else if ((currentTime - _lastTransmissionTime > TRANSMISSION_INTERVAL) && (!_isMoving) && (_schemaType == SCHEME_INTERVAL))
+        {
+          _nextState = STATE_RUN_PAUSE;
+          _lastTransmissionTime = currentTime;
+        }
+        else if ((currentTime - _lastTransmissionTime > TRANSMISSION_INTERVAL) && (_isMoving) && (_schemaType == SCHEME_INTERVAL))
         {
           _nextState = STATE_RUN_TX;
           _lastTransmissionTime = currentTime;
         }
-        else if ((currentTime - _lastTransmissionTime > TRANSMISSION_DELAY) && (_schemaType == SCHEME_REPEAT))
+        else if ((currentTime - _lastTransmissionTime > TRANSMISSION_DELAY) && (!_isMoving) && (_schemaType == SCHEME_REPEAT))
+        {
+          // during static operation allow periodic transmissions
+          if(_staticIntervalCounter > 0)
+          {
+            _nextState = STATE_RUN_PAUSE;
+            _staticIntervalCounter--;
+          }
+          else
+          {
+            _nextState = STATE_RUN_TX;
+            _staticIntervalCounter = STATIC_INTERVAL_COUNT;
+          }
+          _lastTransmissionTime = currentTime;
+        }
+        else if ((currentTime - _lastTransmissionTime > TRANSMISSION_DELAY) && (_isMoving) && (_schemaType == SCHEME_REPEAT))
         {
           _nextState = STATE_RUN_TX;
           _lastTransmissionTime = currentTime;
@@ -170,19 +205,59 @@ void PE1MEW_TTNMapperNode::process(void)
       break;
   
       case STATE_RUN_TX:
+        _ledStat.setOff();
+        // send message
         buildPacket();  // prepare payload
         _lora->txBytes(_txBuffer, sizeof(_txBuffer)); // transmit payload
         _ledAct.setOff();
-        _nextState = STATE_GPS_VALID; // return to idle state
-
+        evaluateMoving();
+                
         if ( _schemaType == SCHEME_REPEAT)
         {
           _lastTransmissionTime = millis();
         }
+
+        _nextState = STATE_GPS_VALID; // return to idle state
+
       break;
 
+      case STATE_RUN_PAUSE:
+        // \todo add system pause here
+
+        // Try to set timer with 2000 ms
+        // if true, set is success; continue
+        // if false; timer was set before continue
+        if(!timer1.set(2000))
+        {
+          // when timer expired do work:
+          if(timer1.getExpired())
+          {
+            _ledAct.setOff();
+            // housekeeping for detection of static behaviour
+            evaluateMoving();
+                    
+            if ( _schemaType == SCHEME_REPEAT)
+            {
+              _lastTransmissionTime = millis();
+            }
+            
+            _nextState = STATE_GPS_VALID; // return to idle state
+          } // test for button press to override pause state and send packet
+          else if (_buttonState == STATE_PRESSED)
+          {
+            _nextState = STATE_RUN_TX;
+            _button.reset(); // reset button evaluation
+          }
+        }
+        
+      break;
+      
       case STATE_RUN_GEOFENCE:
-        if (!testGeoFence())
+        if (currentTime - _lastGPSFixTime > GPS_RX_FIX_TIMEOUT_TIME)
+        {
+          _nextState = STATE_GPS_DATA;
+        }
+        else if (!testGeoFence())
         {
           _nextState = STATE_GPS_VALID;
         }
@@ -258,11 +333,7 @@ void PE1MEW_TTNMapperNode::initializeRadio()
   //configure your keys and join the network
   bool join_result = false;
 
-  //ABP: initABP(String addr, String AppSKey, String NwkSKey);
-  // Application ID: rfsee_ttnmapper
-  // Device ID: rfsee_drivetest_unit_3
-//  join_result = _lora->initABP(devAddr, nwkSKey, appSKey); // \todo implement this code.
-  join_result = _lora->initABP("26011AB8", "FDB5A9347BFCCC50D8AC4E37F1B91F22", "E7D0BBDC73684E6B803F6976CD1FBB3D");
+  join_result = _lora->initABP(devAddr, nwkSKey, appSKey); // unit 3
 
   while(!join_result)
   {
@@ -278,6 +349,8 @@ void PE1MEW_TTNMapperNode::initializeRadio()
   }
   Serial.println("Successfully joined TTN");
   delay(1000); // wait a second before continuing.
+
+  _lora->setDR(DEFAULT_DR);
   
   _ledAct.setOff();
 }
@@ -302,3 +375,38 @@ bool PE1MEW_TTNMapperNode::testGeoFence(void)
  
   return returnValue;
 }
+
+bool PE1MEW_TTNMapperNode::evaluateMoving(void)
+{
+  double distance = 0.0;
+  double averageDistance = 0.0;
+  
+  // Calculate distance to last known coordinates
+  distance = _gps.distanceBetween( _gps.location.lat(),
+                                   _gps.location.lng(),
+                                   _lastCoordinate.latitude,
+                                   _lastCoordinate.longitude );
+  
+  // add distance to average buffer 
+  _averageDistanceBuffer.addValue((float)distance);
+  averageDistance = _averageDistanceBuffer.getAverage();
+  
+  // evaluate average distance
+  // test for average distance and that the last distance was not one while moving.
+  if ((averageDistance < MOVING_TEST_DISTANCE) && (distance < MOVING_TEST_DISTANCE))
+  {
+    _isMoving = false;
+  }
+  else
+  {
+    _isMoving = true;
+  }
+  
+  // update current coordinates for next usage
+  _lastCoordinate.latitude = _gps.location.lat();
+  _lastCoordinate.longitude = _gps.location.lng();
+  
+  return _isMoving;
+}
+
+
