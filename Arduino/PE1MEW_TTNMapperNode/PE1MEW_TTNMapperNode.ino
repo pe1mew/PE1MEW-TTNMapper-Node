@@ -126,12 +126,9 @@
  
    var altValue = ((bytes[6]<<8)>>>0) + bytes[7];
    var sign = bytes[6] & (1 << 7);
-   if(sign)
-   {
+   if(sign){
      decoded.alt = 0xFFFF0000 | altValue;
-   }
-   else
-   {
+   }else{
      decoded.alt = altValue;
    }
  
@@ -220,4 +217,3 @@ void setup() {
 void loop() {
   ttnMapperNode.process();
 }
-
