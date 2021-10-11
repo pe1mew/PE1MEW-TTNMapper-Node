@@ -23,6 +23,7 @@
 ///
 /// version | Date       | Note 
 /// --------|------------|--------------------------
+/// 1.5     | 11-10-2021 | removed wait in loop() for USB serial port.
 /// 1.4     | 10-10-2021 | Updated to latest version of JP Meijers RN2483 library: https://github.com/jpmeijers/RN2483-Arduino-Library. This update adresses some startup issues with the RN2483 module.
 /// 1.3     | 12-1-2019  | Added transmission during static operation inhibit
 /// 1.2     | 18-09-2018 | Additions for static behaviour
@@ -189,7 +190,6 @@
 // Includes
 
 #include "PE1MEW_TTNMapperNode.h"
-//#include <rn2xx3.h>                 // LoRa radio RN2xx3 class from libraries
 #include "rn2xx3.h"                 // LoRa radio RN2xx3 class local copy
 
 // Create objects
@@ -208,10 +208,10 @@ void setup() {
   Serial.begin(4800);   //serial to computer (TX) and GPS (RX)
   Serial1.begin(57600); //serial to RN2xx3
 
-  // make sure usb serial connection is available,
-  // or after 10s go on anyway for 'headless' use of the
-  // node.
-  while ((!Serial) && (millis() < 10000));
+//  // make sure usb serial connection is available,
+//  // or after 10s go on anyway for 'headless' use of the
+//  // node.
+//  while ((!Serial) && (millis() < 10000));
 
   ttnMapperNode.initializeRadio();  // initialize LoRa radio in PE1MEW_TTNMapperNode object.
 }

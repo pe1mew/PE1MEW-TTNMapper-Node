@@ -48,8 +48,9 @@ PE1MEW_TTNMapperNode::PE1MEW_TTNMapperNode(rn2xx3* loraObject):
   _hdopGps(0),
   _moveCounter(0),
   _isMoving(true),
+  _dataRate(0),
   _staticIntervalCounter(STATIC_INTERVAL_COUNT),
-  _schemaType(SCHEME_REPEAT),
+  _schemaType(SCHEME_INTERVAL),
   _buttonState(STATE_NOT_PRESSED),
   _lora(loraObject)  
 {
@@ -161,25 +162,31 @@ void PE1MEW_TTNMapperNode::process(void){
       case STATE_GPS_VALID:
         if (currentTime - _lastGPSFixTime > GPS_RX_FIX_TIMEOUT_TIME){
           _nextState = STATE_GPS_DATA;
+          
         }else if (testGeoFence()){
+          // Node is located within geofence.
           _nextState = STATE_RUN_GEOFENCE;
-        }else if ((currentTime - _lastTransmissionTime > TRANSMISSION_INTERVAL) && (!_isMoving) && (_schemaType == SCHEME_INTERVAL)){
+          
+        }else if ((currentTime - _lastTransmissionTime > TRANSMISSION_INTERVAL) && (!_isMoving) && (_schemaType == SCHEME_DISTANCE)){
           _nextState = STATE_RUN_PAUSE;
           _lastTransmissionTime = currentTime;
-        }else if ((currentTime - _lastTransmissionTime > TRANSMISSION_INTERVAL) && (_isMoving) && (_schemaType == SCHEME_INTERVAL)){
+          
+        }else if ((currentTime - _lastTransmissionTime > TRANSMISSION_INTERVAL) && (_isMoving) && (_schemaType == SCHEME_DISTANCE)){
           _nextState = STATE_RUN_TX;
           _lastTransmissionTime = currentTime;
-        }else if ((currentTime - _lastTransmissionTime > TRANSMISSION_DELAY) && (!_isMoving) && (_schemaType == SCHEME_REPEAT)){
-          // during static operation allow periodic transmissions
+          
+        }else if ((currentTime - _lastTransmissionTime > TRANSMISSION_DELAY) && (!_isMoving) && (_schemaType == SCHEME_INTERVAL)){
+          // Node is not moving: During static operation allow periodic transmissions
           if(_staticIntervalCounter > 0){
             _nextState = STATE_RUN_PAUSE;
             _staticIntervalCounter--;
           }else{
             _nextState = STATE_RUN_TX;
-            _staticIntervalCounter = STATIC_INTERVAL_COUNT;
+            _staticIntervalCounter = STATIC_INTERVAL_COUNT;  // reset interval counter
           }
           _lastTransmissionTime = currentTime;
-        }else if ((currentTime - _lastTransmissionTime > TRANSMISSION_DELAY) && (_isMoving) && (_schemaType == SCHEME_REPEAT)){
+          
+        }else if ((currentTime - _lastTransmissionTime > TRANSMISSION_DELAY) && (_isMoving) && (_schemaType == SCHEME_INTERVAL)){
           _nextState = STATE_RUN_TX;
           _lastTransmissionTime = currentTime;
         }
@@ -189,11 +196,25 @@ void PE1MEW_TTNMapperNode::process(void){
         _ledStat.setOff();
         // send message
         buildPacket();  // prepare payload
+
+        /*
+         * This portion of code is to cyclic set a data rate starting at DR 0 (SF12)
+         * to DR 5 (SF7).
+         * - First test is actual datarate is a value from 0 to 5.
+         * - If data rate is > 5 reset to 0.
+         * - Send message and increment data rate for next transmission.
+         */
+        if(_dataRate > DATA_RATE_MAXIUM){
+          _dataRate = DATA_RATE_MINIMUM;
+        }
+        _lora->setDR(_dataRate++);
+
+        
         _lora->txBytes(_txBuffer, sizeof(_txBuffer)); // transmit payload
         _ledAct.setOff();
         evaluateMoving();
                 
-        if ( _schemaType == SCHEME_REPEAT){
+        if ( _schemaType == SCHEME_INTERVAL){
           _lastTransmissionTime = millis();
         }
 
@@ -214,7 +235,7 @@ void PE1MEW_TTNMapperNode::process(void){
             // housekeeping for detection of static behaviour
             evaluateMoving();
                     
-            if ( _schemaType == SCHEME_REPEAT){
+            if ( _schemaType == SCHEME_INTERVAL){
               _lastTransmissionTime = millis();
             }
             _nextState = STATE_GPS_VALID; // return to idle state
@@ -387,6 +408,30 @@ bool PE1MEW_TTNMapperNode::evaluateMoving(void){
   
   // update current coordinates for next usage
   _lastCoordinate.latitude = _gps.location.lat();
+  _lastCoordinate.longitude = _gps.location.lng();
+  
+  return _isMoving;
+}
+
+bool PE1MEW_TTNMapperNode::evaluateMoving(double distanceMeters){
+  double distance = 0.0;
+//  double averageDistance = 0.0;
+  
+  // Calculate distance to last known coordinates
+  distance = _gps.distanceBetween( _gps.location.lat(),
+                                   _gps.location.lng(),
+                                   _lastCoordinate.latitude,
+                                   _lastCoordinate.longitude );
+  
+  // test for distance travelled while moving.
+  if (distance < distanceMeters){
+    _isMoving = false;
+  }else{
+    _isMoving = true;
+  }
+  
+  // update current coordinates for next usage
+  _lastCoordinate.latitude  = _gps.location.lat();
   _lastCoordinate.longitude = _gps.location.lng();
   
   return _isMoving;

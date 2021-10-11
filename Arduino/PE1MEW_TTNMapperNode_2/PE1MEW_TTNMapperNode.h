@@ -27,7 +27,6 @@
 #include "PE1MEW_Led.h"                 // PE1MEW_Led class
 #include "PE1MEW_Button.h"              // PE1MEW_Button class
 #include "TinyGPS++.h"                  // TinyGPS++ class
-//#include <rn2xx3.h>                   // LoRa radio RN2xx3 class from library
 #include "rn2xx3.h"                     // LoRa radio RN2xx3 class local copy
 #include "RunningAverage.h"             // Running average library
 #include "PE1MEW_Timer.h"
@@ -35,15 +34,7 @@
 #define GPS_LED_PIN               2     ///< Pin to which the GPS LED is connected
 #define STAT_LED_PIN              1     ///< Pin to which the Status LED is connected
 #define ACT_LED_PIN               0     ///< Pin to which the Activity LED is connected
-
-//#define GPS_RX_DATA_TIMEOUT_TIME  5000  ///< timeout in milliseconds for data reception of GPS (5 seconds)
-//#define GPS_RX_FIX_TIMEOUT_TIME   5000  ///< timeout in mill seconds for the GPS FIX (5 seconds)
-//#define TRANSMISSION_INTERVAL     10000 ///< Transmission interval in milliseconds (10 seconds) to be used with SCHEME_INTERVAL
-//#define TRANSMISSION_DELAY        8000  ///< Delay between transmissions. to be used with SCHEME_REPEAT
-//
-//#define DEFAULT_DR                3     ///< default datarate SF9
-//
-//#define PAYLOAD_BUFFER_SIZE       9     ///< paylod message size
+#define BUTTON_PIN                24    ///< Pin to which the Activity LED is connected
 
 /// \brief Defines states of the TTN Mapper Node.
 typedef enum {
@@ -57,8 +48,8 @@ typedef enum {
 
 /// \brief Defines transmission scheme.
 typedef enum {
-   SCHEME_INTERVAL,    ///< Transmission at regular intervals
-   SCHEME_REPEAT       ///< repeat transmission with fixed delay
+   SCHEME_DISTANCE,     ///< Transmission at regular distance
+   SCHEME_INTERVAL      ///< Transmission with fixed time delay
 } eSchema;
 
 typedef struct{
@@ -79,73 +70,42 @@ private:
   const static int GPS_RX_DATA_TIMEOUT_TIME = 5000;  ///< timeout in milliseconds for data reception of GPS (5 seconds)
   const static int GPS_RX_FIX_TIMEOUT_TIME =  5000;  ///< timeout in mill seconds for the GPS FIX (5 seconds)
   
-  const static int TRANSMISSION_INTERVAL =    10000; ///< Transmission interval in milliseconds (10 seconds) to be used with SCHEME_INTERVAL
-  const static int TRANSMISSION_DELAY =       8000;  ///< Delay between transmissions. to be used with SCHEME_REPEAT
+  const static int TRANSMISSION_INTERVAL =    10000; ///< Transmission interval in milliseconds (10 seconds) to be used with SCHEME_DISTANCE
+  const static int TRANSMISSION_DELAY =       8000;  ///< Delay between transmissions. to be used with SCHEME_INTERVAL
   const static int STATIC_INTERVAL_COUNT =    50;    ///< When state is static transmit after n times not transmitting send message anyway
   const static int DEFAULT_DR =               3;     ///< default datarate SF9
   const static int PAYLOAD_BUFFER_SIZE =      9;     ///< paylod message size
 
-  /// Current state of the node
-  eStates _currentState;
+  const static int DATA_RATE_MINIMUM =        0;     ///< Minimum datarate accoring to LoRaWAN specification (equals SF12)
+  const static int DATA_RATE_MAXIUM =         5;     ///< Maximum datarate accoring to LoRaWAN specification (equals SF7)
   
-  /// Next state of the node 
-  eStates _nextState;
-
-  /// Time in milliseconds at which last data is received
-  unsigned long _lastGPSDataTime;
-
-  /// Time in milliseconds of last GPS fix.  
-  unsigned long _lastGPSFixTime;          
-  
-  /// Time in milliseconds of last transmission.  
-  unsigned long _lastTransmissionTime;    
-
-  /// Payload buffer
-  uint8_t  _txBuffer[PAYLOAD_BUFFER_SIZE];
-
-  /// Binary representation of the latitude field of a coordinate
-  uint32_t _latitudeBinary;
-  
-  /// Binary representation of the longitude field of a coordinate
-  uint32_t _longitudeBinary;
-  
-  /// Altitude in meters of the node
-  uint16_t _altitudeGps;
-  
-  /// HDOP of the GPS. HDOP represents accuracy of the coordinate
-  uint8_t  _hdopGps;
-
+  eStates _currentState;                  ///< Current state of the node
+  eStates _nextState;                     ///< Next state of the node 
+  unsigned long _lastGPSDataTime;         ///< Time in milliseconds at which last data is received
+  unsigned long _lastGPSFixTime;          ///< Time in milliseconds of last GPS fix.  
+  unsigned long _lastTransmissionTime;    ///< Time in milliseconds of last transmission. 
+  uint8_t  _txBuffer[PAYLOAD_BUFFER_SIZE];///< Payload buffer
+  uint32_t _latitudeBinary;               ///< Binary representation of the latitude field of a coordinate
+  uint32_t _longitudeBinary;              ///< Binary representation of the longitude field of a coordinate
+  uint16_t _altitudeGps;                  ///< Altitude in meters of the node
+  uint8_t  _hdopGps;                      ///< HDOP of the GPS. HDOP represents accuracy of the coordinate
   uint8_t  _moveCounter;
-
-  bool _isMoving;
-
+  bool     _isMoving;
+  uint8_t  _dataRate;                     ///< datarate minium is 0 maximum is 5 accoring to LoRaWAN sepcification
   int _staticIntervalCounter;
-  
   Coordinate_t _lastCoordinate;
-
   eSchema _schemaType;
-
-  /// GPS-LED (Green) for information about the GPS operation.
-  PE1MEW_Led _ledGPS = PE1MEW_Led(GPS_LED_PIN);
   
-  /// Status-LED (Yellow) for information about the Node operation.
-  PE1MEW_Led _ledStat = PE1MEW_Led(STAT_LED_PIN);
+  PE1MEW_Led _ledGPS    = PE1MEW_Led(GPS_LED_PIN);   ///< GPS-LED (Green) for information about the GPS operation.
+  PE1MEW_Led _ledStat   = PE1MEW_Led(STAT_LED_PIN);  ///< Status-LED (Yellow) for information about the Node operation.
+  PE1MEW_Led _ledAct    = PE1MEW_Led(ACT_LED_PIN);   ///< Activity-LED (Yellow) for information about the LoRa radio operation.
+  PE1MEW_Button _button = PE1MEW_Button(BUTTON_PIN); ///< activity button (ACT)
   
-  /// Activity-LED (Yellow) for information about the LoRa radio operation.
-  PE1MEW_Led _ledAct = PE1MEW_Led(ACT_LED_PIN); 
-
-  PE1MEW_Button _button = PE1MEW_Button(24);
-
   eStateButton _buttonState;
 
-  /// GPS object
-  TinyGPSPlus _gps = TinyGPSPlus();
-
-  /// rn2453 object
-  rn2xx3* _lora;
-
+  TinyGPSPlus _gps = TinyGPSPlus();       ///< GPS object
+  rn2xx3* _lora;                          ///< rn2453 object
   RunningAverage _averageDistanceBuffer = RunningAverage(MOVING_COUNTER_MAXIMUM);
-
   PE1MEW_Timer timer1 = PE1MEW_Timer();
  
 //functions
@@ -188,7 +148,15 @@ private:
   /// \return true if coordinate is within geofence, false if coordinate is outside geofence.
   bool testGeoFence(void);
 
+  /// \brief test if node is moving.
+  /// This function is to be used to see if the node is static or not.
+  /// \return true when moving
   bool evaluateMoving(void);
+
+  /// \brief test is node moved a specific distance
+  /// \param distanceMeters Distance in meters to be evaluated.
+  /// \return true when disntance is travelled
+  bool evaluateMoving(double distanceMeters);
    
 }; //PE1MEW_TTNMapperNode
 

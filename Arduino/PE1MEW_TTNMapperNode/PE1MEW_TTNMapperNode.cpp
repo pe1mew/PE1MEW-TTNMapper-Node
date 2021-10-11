@@ -302,7 +302,7 @@ void PE1MEW_TTNMapperNode::initializeRadio(){
   join_result = _lora->initABP(devAddr, nwkSKey, appSKey); // unit 3
 #else
   Serial.println("Mode: OTAA");
-  join_result = _lora->initOTAA(devAddr, nwkSKey, appSKey); // unit 3
+  join_result = _lora->initOTAA(appEUI, appKEY, devEUI); // unit 3
 #endif
 
   while(!join_result){
