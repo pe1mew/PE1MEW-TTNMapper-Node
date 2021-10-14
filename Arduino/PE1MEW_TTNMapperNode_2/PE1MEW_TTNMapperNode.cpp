@@ -19,13 +19,6 @@
 /// \author Remko Welling (PE1MEW)
 /// \version See revision table
 ///
-/// ## revision table
-/// Version | Comment
-/// --------|-----------------------------------
-/// 1.0     | Initial version
-/// 1.1     | Added functionality to stop transmitting when node is not moving. Removed static ABP parameters and moved to file PE1MEW_TTNMapper_configuration.h
-/// 1.2     | Added functionality to periodically transmit when node is not moving
-/// 1.3     | Added define for mode selection ABP or OTAA, changed code-style.
 
 #include "PE1MEW_TTNMapperNode.h"
 
@@ -220,6 +213,8 @@ void PE1MEW_TTNMapperNode::process(void){
 
         _nextState = STATE_GPS_VALID; // return to idle state
 
+        _lora->setDutyCycle(); // override duty cycle setting as received from network
+        
       break;
 
       case STATE_RUN_PAUSE:
@@ -363,6 +358,8 @@ void PE1MEW_TTNMapperNode::initializeRadio(){
 
   _lora->setDR(DEFAULT_DR);
   
+  _lora->setDutyCycle();
+  
   _ledAct.setOff();
 }
 
@@ -402,6 +399,7 @@ bool PE1MEW_TTNMapperNode::evaluateMoving(void){
   // test for average distance and that the last distance was not one while moving.
   if ((averageDistance < MOVING_TEST_DISTANCE) && (distance < MOVING_TEST_DISTANCE)){
     _isMoving = false;
+//    _isMoving = true; // override moving detection for development
   }else{
     _isMoving = true;
   }

@@ -3,8 +3,10 @@
  *
  * @Author JP Meijers
  * @Author Nicolas Schteinschraber
- * @Date 18/12/2015
- *
+ * @Author Remko Welling (pe1mew)
+ * @Date 20/14/2021
+ * 
+ * Added function to disable duty cycle.
  */
 
 #ifndef rn2xx3_h
@@ -212,6 +214,8 @@ class rn2xx3
      * Returns false if you are trying to use the wrong channels on the wrong module type.
      */
     bool setFrequencyPlan(FREQ_PLAN);
+
+    bool setDutyCycle();
 
     /*
      * Returns the last downlink message HEX string.

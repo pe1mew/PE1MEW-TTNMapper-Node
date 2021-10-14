@@ -17,7 +17,17 @@
 /// \brief TTN Mapper class to control the TTN Mapper node
 /// \date 15-3-2017
 /// \author Remko Welling (PE1MEW)
-/// \version 1.0  Initial version
+/// \version See revision table
+///
+/// ## revision table
+///
+/// Version | date       | Comment
+/// --------|------------|----------------------
+/// 1.0     |            | Initial version
+/// 1.1     |            | Added functionality to stop transmitting when node is not moving. Removed static ABP parameters and moved to file PE1MEW_TTNMapper_configuration.h
+/// 1.2     |            | Added functionality to periodically transmit when node is not moving
+/// 1.3     |            | Added define for mode selection ABP or OTAA, changed code-style.
+/// 1.4     | 14-10-2021 | Added function to override duty cycle seting afte each transmission to override MAC commands
 
 #ifndef __PE1MEW_TTNMAPPERNODE_H__
 #define __PE1MEW_TTNMAPPERNODE_H__

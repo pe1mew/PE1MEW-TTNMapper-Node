@@ -666,7 +666,7 @@ bool rn2xx3::setFrequencyPlan(FREQ_PLAN fp)
 
     case TTN_EU_DRIVETEST:
     {
-      // This frequency plan has duty cycle limit set to 10% to allow maximum resolution
+      // This frequency plan has duty cycle limit set off
       
       if(_moduleType == RN2483)
       {
@@ -688,7 +688,7 @@ bool rn2xx3::setFrequencyPlan(FREQ_PLAN fp)
         uint32_t freq = 867100000;
         for (uint8_t ch = 0; ch < 8; ch++)
         {
-          setChannelDutyCycle(ch, 9); // All channels
+          setChannelDutyCycle(ch, 0); // All channels set to duty cycle of 49% (2)
           if (ch == 1)
           {
             setChannelDataRateRange(ch, 0, 6);
@@ -960,3 +960,31 @@ bool rn2xx3::setTXoutputPower(int pwridx)
 {
   return sendMacSet(F("pwridx"), String(pwridx));
 }
+
+bool rn2xx3::setDutyCycle()
+{
+  bool returnValue = false;
+  
+  if(_moduleType == RN2483)
+  {
+  /*
+   * The <dutyCycle> value that needs to be configured can be
+   * obtained from the actual duty cycle X (in percentage)
+   * using the following formula: <dutyCycle> = (100/X) – 1
+   *
+   * 0 -> disbled
+   * 
+   * Most of the TTN_EU frequency plan was copied from:
+   * https://github.com/TheThingsNetwork/arduino-device-lib
+   */
+    
+    for (uint8_t ch = 0; ch < 8; ch++)
+    {
+      setChannelDutyCycle(ch, 0); // All channels set to duty cycle of 49% (2)
+    }
+    returnValue = true;
+  }
+  
+  return returnValue;
+}
+  
